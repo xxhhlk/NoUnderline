@@ -1,0 +1,5 @@
+# Theos and dpkg both want plain LF; keep the checkout platform-independent.
+* text=auto eol=lf
+
+*.deb binary
+*.dylib binary

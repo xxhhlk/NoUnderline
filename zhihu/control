@@ -1,0 +1,9 @@
+Package: com.xxhhlk.nounderline.zhihu
+Name: NoUnderline (Zhihu)
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Remove the dashed underline under highlighted sentences and the popup that appears when you tap them.
+Maintainer: xxhhlk
+Author: xxhhlk
+Section: Tweaks
+Depends: firmware (>= 13.0)
