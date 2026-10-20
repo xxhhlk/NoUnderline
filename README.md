@@ -66,7 +66,7 @@ make package -C zhihu              # 只构建知乎
 ```
 
 产物在各自的 `packages/` 下，例如
-`zhihu/packages/com.xxhhlk.nounderline.zhihu_1.0.0_iphoneos-arm64.deb`。
+`zhihu/packages/com.xxhhlk.nounderline.zhihu_1.0.1_iphoneos-arm.deb`。
 
 `TARGET := iphone:clang:13.7:11.0` 里的 `11.0` 不能省：deployment target 设成 13.0 会让编译器
 生成 `LC_BUILD_VERSION` 加载命令，老版本的 substitute-loader 不认识它，插件会静默不注入。
@@ -75,15 +75,38 @@ make package -C zhihu              # 只构建知乎
 ## 安装
 
 ```bash
-# iOS 13 上 dpkg 把系统架构报成 iphoneos-arm，而包声明的是 iphoneos-arm64
-dpkg --force-architecture -i com.xxhhlk.nounderline.zhihu_1.0.0_iphoneos-arm64.deb
-dpkg --configure --force-depends com.xxhhlk.nounderline.zhihu:iphoneos-arm64
+dpkg -i com.xxhhlk.nounderline.zhihu_1.0.1_iphoneos-arm.deb
 killall -9 osee2unifiedRelease
 ```
 
-`dpkg -l | grep nounderline` 必须是 `ii`（`install ok installed`）。如果停在 `iU`
-（unpacked），Substitute 会跳过这个插件不加载 —— 通常是因为依赖不满足，用上面的
-`--configure --force-depends` 补一次。
+`dpkg -l | grep nounderline` 必须是 `ii`（`install ok installed`），且**包名后面不带 `:架构` 后缀**。
+如果停在 `iU`（unpacked），Substitute 会跳过这个插件不加载。
+
+### `Architecture:` 必须写 `iphoneos-arm`，不能写 `iphoneos-arm64`
+
+iOS 13 上 `dpkg --print-architecture` 报的是 `iphoneos-arm`。如果 `control` 里写
+`Architecture: iphoneos-arm64`，会连锁出三个问题：
+
+1. 安装必须加 `--force-architecture`，否则 dpkg 直接拒绝；
+2. 依赖在**包自己的架构语境**里解析，`Depends: firmware (>= 13.0)` 会去找
+   `firmware:iphoneos-arm64`（实际装的是 `firmware:iphoneos-arm`）→ 永远不满足 →
+   包停在 `iU` 不配置 → 插件不注入；
+3. 包在 dpkg 里显示成 `com.xxhhlk.nounderline.zhihu:iphoneos-arm64`（带后缀的"外来架构"包），
+   **APT/Sileo 会按架构过滤掉它，已安装列表里根本看不到**。
+
+二进制是 arm64 和包声明成 `iphoneos-arm` 并不冲突：前者是 Mach-O 里的 CPU 类型，后者是包管理器的
+平台标识，rootful 越狱上就应该写 `iphoneos-arm`。
+
+## 改名 / 改 dylib 文件名的坑（实测）
+
+**Substitute 的插件清单是开机时建立的快照，运行时新增的 dylib 文件名不会被注入 —— respring 也不行，
+必须重启（unc0ver 半不完美越狱要重新越狱）。**
+
+验证方法：把一个确认能注入的 `Dim.dylib` + `Dim.plist` 复制成 `ZZTest.dylib` + `ZZTest.plist`，
+respring 后看 SpringBoard 的注入日志 —— `Dim` 在名单里，`ZZTest` 不在。同理，把本插件从
+`NoZhiHuLine` 改名成 `NoUnderlineZhihu` 后，它在任何进程里都不再被注入，日志里连 "Injecting" 都没有。
+
+所以：改 tweak 名 = 需要重启一次。临时验证逻辑改动时，**别改 `TWEAK_NAME`**，只改代码。
 
 ## Choicy 用户请注意
 
