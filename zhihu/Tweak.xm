@@ -39,5 +39,7 @@ static char kNZKey;
 %end
 
 %ctor {
-    NZLog(@"=== NoUnderline/Zhihu 1.0.0 loaded (pid %d) ===", getpid());
+    // No version here on purpose: the string used to hardcode the package
+    // version and drifted every time control was bumped.
+    NZLog(@"=== NoUnderline/Zhihu loaded (pid %d) ===", getpid());
 }
