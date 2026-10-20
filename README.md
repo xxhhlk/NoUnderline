@@ -42,8 +42,9 @@ text-decoration: none;
 而页面的规则总是在我们之后追加）。所以只能用 **内联样式 + `'important'` 优先级**
 （`el.style.setProperty(prop, val, 'important')`），内联的最高优先级永远赢。
 
-清掉的属性：`border-bottom` 系列 / `text-decoration` / `background-image` / `box-shadow`，
-再对元素设 `pointer-events: none`，让点击落到外层没有 highlight id 的 `<p>` 上，浮层就不会弹。
+清掉的属性：`border-bottom` 系列 / `text-decoration` / `background-image` /
+`background-color` / `box-shadow`，伪元素用一段注入的 `<style>` 置为 `display:none`。
+点击浮层则在 capture 阶段拦掉（见「已知取舍」）。
 
 ### 两个必须注意的坑
 
@@ -110,26 +111,27 @@ respring 后看 SpringBoard 的注入日志 —— `Dim` 在名单里，`ZZTest`
 
 ## Choicy 用户请注意
 
-如果装了 Choicy，插件是否注入取决于它的配置：
-
-- **全局/该 App 是黑名单模式**：什么都不用做。
-- **该 App 是白名单模式（`allowDenyMode = 2`）**：必须把对应的插件名
-  （`NoUnderlineZhihu` / 后续的 `NoUnderlineWeChat`）加进这个 App 的 `allowedTweaks`，
-  否则插件不注入。知乎默认就是白名单模式。
+实测结论：**在 unc0ver + Substitute 下，Choicy 的按 App 白/黑名单并不参与注入决策**。证据是
+SpringBoard 的 `allowedTweaks` 是空数组（白名单模式）却仍然注入了 83 个 dylib —— 注入完全由各插件
+自己的 `Filter` plist 决定。所以本插件不需要在 Choicy 里做任何配置；换到 libhooker
+（Odyssey / Taurine）时才需要再看。
 
 ## 已知取舍
 
-- `pointer-events: none` 是"让浮层不弹"的最省事做法，副作用是**划线的那句文字没法长按选中/复制**
-  （拖选整段仍然可以）。更干净的做法是在 capture 阶段对划线元素 `stopImmediatePropagation()`
-  且不 `preventDefault`，可以保留选中能力 —— 见下方 TODO。
-- 浮层目前是靠"点不到"间接消除的，没有主动去 `display:none` 那个浮层节点。网页版脚本的做法是
+- **1.1.0 起不再用 `pointer-events: none`。** 那招虽然能挡住点击，但会让划线文字变成"不可命中"的目标，
+  长按选不中、也复制不了，整段正文的手感都不对。现在改成：元素照常接收输入，我们在 **capture 阶段**
+  对落在划线元素上的 `click` / `touchend` 调 `stopImmediatePropagation()`，且**不** `preventDefault` ——
+  页面的浮层逻辑收不到事件，而原生文字选择、拖选、系统复制菜单都还能用。
+- 伪元素（`::before` / `::after`）用一个注入的 `<style id="nhl-style">` 置为 `display:none`，
+  并定期重新追加到 `<head>` 末尾，避免被页面后加的样式表压过。
+- 浮层是"收不到事件"所以不弹，并没有主动去 `display:none` 那个浮层节点。网页版脚本的做法是
   识别浮层里的三个 SVG 图标（`ZDI--Repeat24` / `ZDI--Heart24` / `ZDI--ChatBubble24`）后直接隐藏，
   App 内的 DOM 结构如果一致也可以照做。
 
 ## TODO
 
-- [ ] 把 `pointer-events: none` 换成 capture 阶段拦截 click，恢复划线文字的可选中性
-- [ ] 补 `::before` / `::after` 的 `display: none`（页面可能用伪元素画装饰线）
+- [x] 把 `pointer-events: none` 换成 capture 阶段拦截，恢复划线文字的可选中性（1.1.0）
+- [x] 补 `::before` / `::after` 的 `display: none`（1.1.0）
 - [ ] 微信 `com.weixin` 公众号文章划线支持
 - [ ] 插件内提供开关（PreferenceLoader），不用改代码就能关掉
 
