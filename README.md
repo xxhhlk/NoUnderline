@@ -13,8 +13,42 @@ App 的其它功能（评论区、正常滚动、长按选中文字、图片查�
 
 | 目标 | Bundle ID | 插件名 | 状态 |
 | --- | --- | --- | --- |
-| 知乎 | `com.zhihu.ios` | `NoUnderlineZhihu` | ✅ 可用（v1.3.x，全文视图 + 卡片视图） |
+| 知乎 | `com.zhihu.ios` | `NoUnderlineZhihu` | ✅ 可用（v1.3.3，全文视图 + 卡片视图） |
 | 微信（公众号文章划线） | `com.weixin` | `NoUnderlineWeChat` | 🚧 规划中，见 `wechat/README.md` |
+
+## 测试环境
+
+开发与验证全部在这台设备上完成，其它环境未测：
+
+| 项 | 值 |
+| --- | --- |
+| 设备 | iPhone SE2（`iPhone12,8`，D79AP） |
+| 系统 | iOS **13.4.1**（17E8258） |
+| 越狱 | unc0ver，注入器 **Substitute 2.3.1** |
+| 知乎 | **10.46.0**（build 22608，最小系统 13.0，构建 SDK 17.2） |
+| 插件 | `com.xxhhlk.nounderline.zhihu` 1.3.3（`iphoneos-arm`） |
+
+**已验证的知乎版本**
+
+| 版本 | 结果 |
+| --- | --- |
+| 10.46.0 (22608) | ✅ 全文视图 + 卡片视图都正常（`ZRichTextView` / `SCPopMenuSegLike` / `SCPopMenuSelection` 都在） |
+| 10.103.0 (30314) | ✅ 已用解密二进制核对过：三个 hook 目标类都存在，且多出一个 `UnderlineOverlayView`（代码里也 hook 了它，向后兼容） |
+| 11.11.0 (41110) | ❌ **装不上**。`Symbol not found: _$s4Body7SwiftUI6WidgetPTl`（iOS 14 才有的 SwiftUI `Widget` witness），而包自己的 `MinimumOSVersion` 还写着 13.0 —— 是知乎的打包错误，与插件无关。**iOS 13 不要升级到 11.x。** |
+
+目标类在版本间的存亡（用 `strings` 扫二进制的类名字符串得出）：
+
+| 类 / selector | 10.46.0 | 10.103.0 |
+| --- | --- | --- |
+| `ZRichTextView` `-setAttributedText:` | ✅ | ✅ |
+| `SCPopMenuSegLike` `+showPopMenuWithMark:...` | ✅ | ✅ |
+| `SCPopMenuSelection` `+showPopMenuWithTextView:...` | ✅ | ✅ |
+| `UnderlineOverlayView`（独立划线绘制层） | ❌ 已移除 | ✅ 存在 |
+| `ZRichAPI` `+reRenderSegUnderlinesWithTextView:node:` | ❌ 已移除 | ✅ 存在 |
+
+1.3.3 只 hook 上表里前三个（即 10.46.0 上确认存在的），后两个是 10.103.0 才有的旧路径，当前代码**没有**
+hook 它们。如果哪天在 10.103.0 上发现虚线清不干净，那两个就是下一步该补的目标（当时在 1.2.0/1.3.0 里
+挂过，但那两版真正生效的是剥 `NSUnderline` 属性，而剥属性在两个版本上应该都够用）。
 
 ## 知乎有两种视图，必须分别处理
 
@@ -187,15 +221,15 @@ SpringBoard 的 `allowedTweaks` 是空数组（白名单模式）却仍然注入
   链接范围与划线范围 **零重叠**（`underlineOverlap=0`）；全文视图刷了多篇幅也没出现过划线包住 `<a>`
   的 DOM。知乎应该本来就不允许划线覆盖链接（链接要能点、划线要能点，两者冲突）。
   所以这里不需要额外处理。
-- 知乎版本差异：原生类名随版本变过（`UnderlineOverlayView` 在 10.46 上已经不存在，
-  `ZRichAPI +reRenderSegUnderlinesWithTextView:node:` 这个 selector 也查不到了）。现在的代码只 hook
-  确实存在的两个目标。换大版本时如果失效，先用 `strings` 扫一遍二进制确认类名。
+- 知乎版本差异：原生类名会随版本变，详见上面「测试环境」那张对照表。换大版本时如果失效，
+  先用 `strings` 扫一遍二进制确认类名还在不在。
 
 ## TODO
 
 - [x] 把 `pointer-events: none` 换成 capture 阶段拦截，恢复划线文字的可选中性（1.1.0）
 - [x] 补 `::before` / `::after` 的 `display: none`（1.1.0）
 - [x] 卡片视图（原生 ZRichCoreUI）支持（1.3.0 / 1.3.1）
+- [ ] 在 10.103.0 (30314) 上实机复测一遍（已核对类存在，但没在这版上真机验证过效果）
 - [ ] 微信 `com.weixin` 公众号文章划线支持
 - [ ] 插件内提供开关（PreferenceLoader），不用改代码就能关掉
 
